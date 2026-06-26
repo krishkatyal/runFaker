@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RunFaker — Fake Your Run</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">▲</span>
+      <h1>RunFaker</h1>
+      <span class="tagline">Draw it. Fake it. Export it.</span>
+    </div>
+    <div class="token-pill"><span id="tokenCount">∞</span> tokens</div>
+  </header>
+
+  <main class="layout">
+    <!-- ===================== LEFT: MAP ===================== -->
+    <section class="panel map-panel">
+      <div class="panel-head">
+        <h2>Draw Your Route</h2>
+        <p class="hint">Search for a location and click on the map to create your route.</p>
+      </div>
+
+      <div class="map-controls">
+        <form id="searchForm" class="search-box">
+          <input id="searchInput" type="text" placeholder="Search for a place…" autocomplete="off" />
+          <button type="submit" title="Search">⌕</button>
+          <ul id="searchResults" class="search-results"></ul>
+        </form>
+      </div>
+
+      <div id="map" class="map"></div>
+
+      <div class="map-toolbar">
+        <div class="seg-group" role="group" aria-label="Path mode">
+          <span class="seg-label">Align Path to Road</span>
+          <button class="seg active" data-shape="draw">✏ Draw</button>
+          <button class="seg" data-shape="heart">♥ Heart</button>
+          <button class="seg" data-shape="circle">◯ Circle</button>
+        </div>
+        <div class="toolbar-right">
+          <label class="check">
+            <input type="checkbox" id="snapRoad" /> Snap to roads
+          </label>
+          <label class="check">
+            <input type="checkbox" id="showWaypoints" checked /> Show Waypoints
+          </label>
+          <button id="undoBtn" class="ghost-btn" title="Undo last point">↶ Undo</button>
+          <button id="clearBtn" class="ghost-btn danger" title="Clear route">✕ Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== RIGHT: DETAILS ===================== -->
+    <section class="panel details-panel">
+      <div class="panel-head">
+        <h2>Run Details</h2>
+      </div>
+
+      <div class="seg-group activity" role="group" aria-label="Activity type">
+        <button class="seg active" data-activity="run">🏃 Run</button>
+        <button class="seg" data-activity="bike">🚴 Bike</button>
+      </div>
+
+      <h3 class="section-title">Run Stats</h3>
+      <div class="stats-grid">
+        <div class="stat"><div class="stat-val" id="statDistance">0.00 km</div><div class="stat-key">Distance</div></div>
+        <div class="stat"><div class="stat-val" id="statDuration">00:00:00</div><div class="stat-key">Duration</div></div>
+        <div class="stat"><div class="stat-val" id="statElevation">0 m</div><div class="stat-key">Elevation Gain</div></div>
+        <div class="stat"><div class="stat-val" id="statPace">0.00</div><div class="stat-key" id="statPaceUnit">min/km</div></div>
+      </div>
+
+      <div class="field">
+        <label>Pace Unit</label>
+        <select id="paceUnit">
+          <option value="min/km">min/km</option>
+          <option value="min/mi">min/mi</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Average Pace (<span class="paceUnitLabel">min/km</span>)</label>
+        <div class="row">
+          <input type="range" id="avgPace" min="2.5" max="12" step="0.05" value="6.00" />
+          <output id="avgPaceOut">6.00</output>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Pace Inconsistency</label>
+        <div class="row">
+          <input type="range" id="paceVar" min="0" max="60" step="1" value="17" />
+          <output id="paceVarOut">17%</output>
+        </div>
+        <p class="micro" id="paceVarDesc">Moderate pace changes (varied terrain or intervals)</p>
+      </div>
+
+      <div class="field">
+        <label>Elevation Gain (m)</label>
+        <div class="row">
+          <input type="range" id="elevGain" min="0" max="3000" step="10" value="120" />
+          <output id="elevGainOut">120 m</output>
+        </div>
+      </div>
+
+      <hr />
+
+      <label class="check big">
+        <input type="checkbox" id="includeHR" checked /> Include Heart Rate Data
+      </label>
+
+      <div id="hrFields">
+        <div class="field">
+          <label>Average Heart Rate</label>
+          <div class="row">
+            <input type="range" id="avgHR" min="80" max="200" step="1" value="150" />
+            <output id="avgHROut">150 bpm</output>
+          </div>
+          <p class="micro" id="hrDesc">High intensity, vigorous effort</p>
+        </div>
+        <div class="field">
+          <label>Heart Rate Variability</label>
+          <div class="row">
+            <input type="range" id="hrVar" min="0" max="40" step="1" value="10" />
+            <output id="hrVarOut">10%</output>
+          </div>
+          <p class="micro">Moderate heart rate changes (realistic for varied terrain)</p>
+        </div>
+      </div>
+
+      <hr />
+
+      <div class="field">
+        <label>Run Name</label>
+        <input type="text" id="runName" placeholder="Morning Run" />
+      </div>
+      <div class="field two">
+        <div>
+          <label>Date</label>
+          <input type="date" id="runDate" />
+        </div>
+        <div>
+          <label>Start Time</label>
+          <input type="time" id="runTime" value="12:17" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <textarea id="runDesc" rows="2" placeholder="Felt great today…"></textarea>
+      </div>
+
+      <button id="downloadBtn" class="download-btn" disabled>
+        ⬇ Download Run File <span class="cost">(1 Token)</span>
+      </button>
+      <p class="terms">By downloading, you agree to our Terms of Service.</p>
+    </section>
+
+    <!-- ===================== FULL WIDTH: CHARTS ===================== -->
+    <section class="panel charts-panel">
+      <div class="panel-head"><h2>Data Visualization</h2></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-head"><h4>Pace Profile</h4><span id="paceAvgLabel" class="chart-meta">Average: 0.00 min/km</span></div>
+          <canvas id="paceChart" height="160"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><h4>Elevation Profile</h4><span id="elevTotalLabel" class="chart-meta">Total Gain: 0 m</span></div>
+          <canvas id="elevChart" height="160"></canvas>
+        </div>
+        <div class="chart-card" id="hrChartCard">
+          <div class="chart-head"><h4>Heart Rate Profile</h4><span id="hrAvgLabel" class="chart-meta">Average: 0 bpm</span></div>
+          <canvas id="hrChart" height="160"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="js/geo.js"></script>
+  <script src="js/profiles.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/gpx.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
