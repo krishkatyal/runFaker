@@ -174,15 +174,10 @@
   ["runName", "runDate", "runTime", "runDesc"].forEach((id) =>
     $(id).addEventListener("input", () => { state.result = state.result; }));
 
-  // default date = yesterday, and never allow a future date.
-  // Strava (and most platforms) reject activities timestamped in the future,
-  // so we keep the whole run safely in the past by default.
+  // default date = today
   (function initDate() {
-    const today = new Date();
-    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-    const el = $("runDate");
-    el.value = yesterday.toISOString().slice(0, 10);
-    el.max = today.toISOString().slice(0, 10);
+    const d = new Date();
+    $("runDate").value = d.toISOString().slice(0, 10);
   })();
 
   // ----- search (Nominatim) -----
@@ -315,25 +310,29 @@
   // ----- download -----
   $("downloadBtn").addEventListener("click", () => {
     if (!state.result) return;
-    // Guard: platforms like Strava reject activities timestamped in the future.
-    // The run ends at the last sample's time; if that's not safely in the past,
-    // refuse to export and tell the user to pick an earlier date/time.
-    const samples = state.result.samples;
-    const endEpoch = samples[samples.length - 1].time;
-    if (!Number.isFinite(endEpoch) || endEpoch * 1000 >= Date.now()) {
-      toast("Run ends in the future — set an earlier date/time so it imports.");
-      return;
-    }
     const meta = {
       name: $("runName").value.trim() || (state.activity === "bike" ? "Bike Ride" : "Run"),
       desc: $("runDesc").value.trim(),
       activity: state.activity,
       includeHR: $("includeHR").checked,
     };
-    const xml = GPX.build(state.result, meta);
+    // Platforms like Strava reject activities timestamped in the future. The run
+    // ends at the last sample's time; if that lands in the future, slide the whole
+    // track back by the overshoot so it ends right now, keeping the same duration.
+    let result = state.result;
+    const samples = result.samples;
+    const endEpoch = samples[samples.length - 1].time;
+    const nowSec = Date.now() / 1000;
+    let shifted = false;
+    if (Number.isFinite(endEpoch) && endEpoch > nowSec) {
+      const shift = endEpoch - nowSec + 1; // end ~1s before now
+      result = { ...result, samples: samples.map((s) => ({ ...s, time: s.time - shift })) };
+      shifted = true;
+    }
+    const xml = GPX.build(result, meta);
     const safe = meta.name.replace(/[^\w-]+/g, "_").toLowerCase();
     GPX.download(xml, `${safe || "route"}.gpx`);
-    toast("GPX file downloaded ✓");
+    toast(shifted ? "Shifted to end now • GPX downloaded ✓" : "GPX file downloaded ✓");
   });
 
   // redraw charts on resize
